@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
 
         nav = QHBoxLayout()
         self.buttons = []
-        for i, label in enumerate(["概览","搜索","作品与资料","举报","设置"]):
+        for i, label in enumerate(["概览","搜索","作品与资料","已收集","设置"]):
             button = QPushButton(label)
             button.setCheckable(True)
             button.setObjectName("navButton")

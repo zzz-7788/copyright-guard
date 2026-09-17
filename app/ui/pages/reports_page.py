@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
     QScrollArea,
+    QFileDialog,
 )
 
 from app.ui.widgets.common import Card
@@ -18,6 +19,11 @@ from app.ui.reporting.baidu_prepare_dialog import (
 from app.ui.reporting.work_select_dialog import (
     WorkSelectDialog,
 )
+from datetime import datetime
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 
 PLATFORM_LABELS = {
     "unclassified": "未分类",
@@ -57,18 +63,16 @@ class ReportsPage(QWidget):
         # 标题
         # =============================================
 
-        title = QLabel("举报  Reports")
+        title = QLabel("已收集  Collected")
         title.setObjectName("pageTitle")
 
         outer.addWidget(title)
 
         note = QLabel(
-            "举报池会按照侵权平台自动分组。"
-            "搜索来源、页面网站和举报平台彼此独立；"
-            "平台识别结果可以由作者手动修改。"
-            "最终举报提交始终由作者确认。"
+            "集中管理搜索过程中收集的疑似盗文页面。"
+            "你可以按平台查看已收集链接，"
+            "并将结果一键导出，方便后续整理、保存或投诉使用。"
         )
-
         note.setObjectName("muted")
         note.setWordWrap(True)
 
@@ -113,6 +117,22 @@ class ReportsPage(QWidget):
         )
 
         summary_row.addStretch()
+
+        export_btn = QPushButton(
+            "导出 Excel"
+        )
+
+        export_btn.setObjectName(
+            "primaryButton"
+        )
+
+        export_btn.clicked.connect(
+            self.export_excel
+        )
+
+        summary_row.addWidget(
+            export_btn
+        )
 
         refresh_btn = QPushButton(
             "刷新"
@@ -187,6 +207,125 @@ class ReportsPage(QWidget):
     # =============================================
     # 页面刷新
     # =============================================
+    def export_excel(self):
+        items = self.db.list_report_pool()
+
+        if not items:
+            QMessageBox.information(
+                self,
+                "导出 Excel",
+                "举报池目前为空，没有可以导出的内容。",
+            )
+            return
+
+        default_name = (
+            "CopyrightGuard_举报池_"
+            f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        )
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出举报池",
+            default_name,
+            "Excel 文件 (*.xlsx)",
+        )
+
+        if not file_path:
+            return
+
+        if not file_path.lower().endswith(".xlsx"):
+            file_path += ".xlsx"
+
+        try:
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "疑似页面"
+
+            headers = [
+                "作品",
+                "原创链接",
+                "疑似页面链接",
+                "页面网站",
+                "平台",
+                "状态",
+                "收集时间",
+            ]
+
+            sheet.append(headers)
+
+            for item in items:
+                platform = PLATFORM_LABELS.get(
+                    item.get("platform"),
+                    item.get("platform") or "未分类",
+                )
+
+                status = STATUS_LABELS.get(
+                    item.get("status"),
+                    item.get("status") or "",
+                )
+
+                sheet.append([
+                    item.get("work_title") or "",
+                    item.get("original_url") or "",
+                    item.get("url") or "",
+                    item.get("domain") or "",
+                    platform,
+                    status,
+                    item.get("created_at") or "",
+                ])
+
+            # 表头
+            for cell in sheet[1]:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(
+                    horizontal="center",
+                    vertical="center",
+                )
+
+            # URL 和普通文本允许换行
+            for row in sheet.iter_rows(min_row=2):
+                for cell in row:
+                    cell.alignment = Alignment(
+                        vertical="top",
+                        wrap_text=True,
+                    )
+
+            # 设置列宽
+            column_widths = {
+                1: 24,
+                2: 45,
+                3: 55,
+                4: 28,
+                5: 16,
+                6: 14,
+                7: 22,
+            }
+
+            for column_index, width in column_widths.items():
+                sheet.column_dimensions[
+                    get_column_letter(column_index)
+                ].width = width
+
+            sheet.freeze_panes = "A2"
+            sheet.auto_filter.ref = sheet.dimensions
+
+            workbook.save(file_path)
+
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "导出失败",
+                f"Excel 导出失败：\n\n{exc}",
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "导出完成",
+            f"已成功导出 {len(items)} 条记录。\n\n"
+            f"保存位置：\n{file_path}",
+        )
+
 
     def refresh(self):
         self.clear_layout(
@@ -369,31 +508,7 @@ class ReportsPage(QWidget):
                 assign_btn
             )
 
-        else:
-            process_btn = QPushButton(
-                f"处理"
-                f"{PLATFORM_LABELS.get(platform, platform)}"
-                f"投诉"
-            )
-
-            process_btn.setObjectName(
-                "primaryButton"
-            )
-
-            process_btn.clicked.connect(
-                lambda checked=False,
-                p=platform,
-                rows=items:
-                self.process_platform(
-                    p,
-                    rows,
-                )
-            )
-
-            header.addWidget(
-                process_btn
-            )
-
+        
         card.body.addLayout(
             header
         )
