@@ -4,12 +4,15 @@ from datetime import datetime
 from app.utils.url_utils import normalize_url
 
 class Database:
-    def __init__(self):
-        self.path = (
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "copyright_guard.db"
-        )
+    def __init__(self, db_path=None):
+        if db_path:
+            self.path = Path(db_path)
+        else:
+            self.path = (
+                Path(__file__).resolve().parents[2]
+                / "data"
+                / "copyright_guard.db"
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
         self.init_schema()
