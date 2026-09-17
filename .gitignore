@@ -28,6 +28,7 @@ data/*.sqlite3
 # Build
 build/
 dist/
+release/
 *.spec
 *.egg-info/
 

@@ -18,18 +18,35 @@ def get_database_path():
     if not getattr(sys, "frozen", False):
         return None
 
-    # PyInstaller 打包后的 Windows EXE
-    local_app_data = os.environ.get("LOCALAPPDATA")
-
-    if local_app_data:
+    # macOS 打包版本
+    if sys.platform == "darwin":
         data_dir = (
-            Path(local_app_data)
+            Path.home()
+            / "Library"
+            / "Application Support"
             / "CopyrightGuard"
         )
+
+    # Windows 打包版本
+    elif sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+
+        if local_app_data:
+            data_dir = (
+                Path(local_app_data)
+                / "CopyrightGuard"
+            )
+        else:
+            data_dir = (
+                Path.home()
+                / "CopyrightGuard"
+            )
+
+    # 其他系统兜底
     else:
         data_dir = (
             Path.home()
-            / "CopyrightGuard"
+            / ".copyright_guard"
         )
 
     data_dir.mkdir(
@@ -45,17 +62,24 @@ def get_database_path():
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Copyright Guard")
+
     qss = resource_path(
         "app/resources/styles/theme.qss"
     )
+
     if qss.exists():
-        app.setStyleSheet(qss.read_text(encoding="utf-8"))
+        app.setStyleSheet(
+            qss.read_text(encoding="utf-8")
+        )
+
     db_path = get_database_path()
     db = Database(db_path=db_path)
 
     window = MainWindow(db)
     window.show()
+
     sys.exit(app.exec())
 
+    
 if __name__ == "__main__":
     main()
