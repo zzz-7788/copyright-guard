@@ -1,7 +1,13 @@
 """Website exclusion-list parsing and matching, independent of the UI."""
 
 import re
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
+
+
+COMMON_DOMAIN_SUFFIXES = {
+    "com", "net", "org", "cn", "gov", "edu", "fm", "me", "club",
+    "io", "tv", "cc", "co", "info", "biz", "app", "xyz", "top",
+}
 
 
 def website_host(value):
@@ -23,17 +29,29 @@ def website_host(value):
 
 
 def parse_whitelist(text):
-    domains = []
+    rules = []
     for entry in re.split(r"[\s,，;；]+", text.strip()):
         if not entry:
             continue
-        try:
-            host = website_host(entry)
-        except (ValueError, UnicodeError) as exc:
-            raise ValueError(f"无效网站：{entry}（{exc}）") from exc
-        if host not in domains:
-            domains.append(host)
-    return tuple(domains)
+        rule = entry.strip().casefold()
+        if "://" in rule or rule.startswith("//"):
+            try:
+                rule = website_host(rule)
+            except (ValueError, UnicodeError) as exc:
+                raise ValueError(f"无效规则：{entry}（{exc}）") from exc
+        elif any(char in rule for char in "*\x00\r\n") or len(rule) > 200:
+            raise ValueError(f"无效规则：{entry}")
+        else:
+            # Keep complete domains normalized, while allowing entries such as
+            # ``jjwxc``, ``/videos/`` and ``f?kw=`` as URL fragments.
+            try:
+                if "/" not in rule and "?" not in rule and "=" not in rule:
+                    rule = website_host(rule)
+            except (ValueError, UnicodeError):
+                pass
+        if rule not in rules:
+            rules.append(rule)
+    return tuple(rules)
 
 
 class WebsiteFilter:
@@ -58,7 +76,25 @@ class WebsiteFilter:
             host = website_host(url)
         except (ValueError, UnicodeError):
             return False
-        return not any(host == domain or host.endswith("." + domain) for domain in self.domains)
+        decoded_url = unquote(str(url)).casefold()
+        for rule in self.domains:
+            normalized_rule = rule.casefold()
+            domain_rule = (
+                "." in normalized_rule
+                and "/" not in normalized_rule
+                and "?" not in normalized_rule
+                and "=" not in normalized_rule
+            )
+            complete_domain = normalized_rule.rsplit(".", 1)[-1] in COMMON_DOMAIN_SUFFIXES
+            if domain_rule and (
+                host == normalized_rule
+                or host.endswith("." + normalized_rule)
+                or (not complete_domain and host.startswith(normalized_rule + "."))
+            ):
+                return False
+            if not domain_rule and normalized_rule in decoded_url:
+                return False
+        return True
 
     def select(self, results, limit=20):
         """Return up to ``limit`` non-excluded results and the excluded count."""

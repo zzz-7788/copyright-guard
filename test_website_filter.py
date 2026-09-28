@@ -21,11 +21,31 @@ class WebsiteFilterTests(unittest.TestCase):
             self.assertFalse(f.allows(url), url)
 
     def test_invalid_settings(self):
-        for entry in ('*', '*.example.com', 'https://', 'bad_domain.com', 'https://example.com:abc'):
+        for entry in ('*', '*.example.com', 'https://', 'https://example.com:abc'):
             with self.assertRaises(ValueError):
                 parse_whitelist(entry)
         self.assertTrue(WebsiteFilter(True).allows('https://example.com'))
         self.assertTrue(WebsiteFilter().allows('https://anything.org'))
+
+    def test_mixed_domain_keyword_path_and_query_rules(self):
+        rules = parse_whitelist('''
+            jjwxc
+            baike.baidu.com
+            /videos/
+            f?kw=
+            优酷
+        ''')
+        f = WebsiteFilter(True, rules)
+        blocked = (
+            'https://www.jjwxc.net/onebook.php?novelid=1',
+            'https://baike.baidu.com/item/book',
+            'https://example.com/videos/123',
+            'https://tieba.baidu.com/f?kw=book',
+            'https://example.com/%E4%BC%98%E9%85%B7/page',
+        )
+        for url in blocked:
+            self.assertFalse(f.allows(url), url)
+        self.assertTrue(f.allows('https://example.com/books/123'))
 
     def test_setting_roundtrip(self):
         import tempfile

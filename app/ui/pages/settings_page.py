@@ -110,7 +110,8 @@ class SettingsPage(QWidget):
         )
         card.body.addWidget(self.whitelist_enabled)
         note = QLabel("适合填写百度百科、晋江等可信或原创发布网站。域名会同时匹配其子域名。"
-                      "保存后，新搜索会跳过这些网站；已有结果仅隐藏，不删除。")
+                      "也支持 jjwxc、/videos/、f?kw= 等网址关键词或片段。"
+                      "保存后，新搜索会跳过匹配结果；已有结果仅隐藏，不删除。")
         note.setWordWrap(True)
         note.setObjectName("muted")
         card.body.addWidget(note)
@@ -124,7 +125,7 @@ class SettingsPage(QWidget):
         )
 
         self.whitelist.setPlaceholderText(
-            "每行一个域名，例如 baike.baidu.com、jjwxc.net；也支持粘贴完整网址"
+            "每行一个规则，例如 baike.baidu.com、jjwxc、/videos/、f?kw="
         )
 
         form.addRow(
@@ -151,7 +152,7 @@ class SettingsPage(QWidget):
             QMessageBox.warning(self, "排除名单无效", str(exc))
             return
         if self.whitelist_enabled.isChecked() and not domains:
-            QMessageBox.warning(self, "排除名单为空", "请至少填写一个网站，或关闭排除名单。")
+            QMessageBox.warning(self, "排除名单为空", "请至少填写一条规则，或关闭排除名单。")
             return
         self.db.set_setting(
             "whitelist",
