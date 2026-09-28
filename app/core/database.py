@@ -1017,6 +1017,28 @@ class Database:
                 (status, result_id),
             )
 
+    def ignore_unpooled_results(self, work_id):
+        """Archive a work's previous results that were not added to the report pool."""
+        if not work_id:
+            return 0
+
+        with self.connect() as con:
+            cur = con.execute(
+                """
+                UPDATE search_results
+                SET status='ignored'
+                WHERE work_id=?
+                  AND status!='ignored'
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM report_pool
+                      WHERE report_pool.result_id=search_results.id
+                  )
+                """,
+                (work_id,),
+            )
+            return cur.rowcount
+
     def delete_result(self, result_id):
         with self.connect() as con:
             con.execute(

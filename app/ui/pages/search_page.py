@@ -306,6 +306,9 @@ class SearchPage(QWidget):
         self.status_filter.addItem("全部","all")
         for key, value in STATUS_LABEL.items():
             self.status_filter.addItem(value,key)
+        self.status_filter.setCurrentIndex(
+            self.status_filter.findData("potential")
+        )
         self.source_filter = QComboBox()
         self.source_filter.addItem(
             "全部",
@@ -756,6 +759,7 @@ class SearchPage(QWidget):
         if not queries:
             QMessageBox.warning(self, "提示", "请先输入搜索关键词。")
             return
+
         query = next((item for item in failed if item in queries), queries[0])
         if len(queries) > 1:
             from PySide6.QtWidgets import QInputDialog
@@ -833,6 +837,11 @@ class SearchPage(QWidget):
             )
             return
 
+        # Starting a new search closes the previous review batch for this work.
+        # Anything not selected into the report pool becomes ignored and is
+        # hidden by the default "potential" filter.
+        archived_count = self.db.ignore_unpooled_results(work_id)
+
         # ==============================================
         # 初始化任务状态
         # ==============================================
@@ -877,7 +886,8 @@ class SearchPage(QWidget):
             f"开始搜索 · "
             f"0 / {self.search_total} 个任务 · "
             f"{len(self.active_engines)} 个来源 · "
-            f"{len(queries)} 个关键词"
+            f"{len(queries)} 个关键词 · "
+            f"已忽略上一批 {archived_count} 条未收集结果"
         )
 
         self.start.setEnabled(False)
