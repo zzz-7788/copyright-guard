@@ -102,7 +102,8 @@ class BaiduSearchProvider(SearchProvider):
             "resource_type_filter": [
                 {
                     "type": "web",
-                    "top_k": 20,
+                    # 多取候选项，排除可信/原创站点后再保留前 20 条。
+                    "top_k": 50,
                 }
             ],
         }

@@ -104,13 +104,13 @@ class SettingsPage(QWidget):
 
         card = Card("Websites / 网站")
 
-        self.whitelist_enabled = QCheckBox("启用白名单：只保留名单内的网站")
+        self.whitelist_enabled = QCheckBox("启用排除名单：跳过名单内的网站")
         self.whitelist_enabled.setChecked(
             self.db.get_setting("whitelist_enabled", "0") == "1"
         )
         card.body.addWidget(self.whitelist_enabled)
-        note = QLabel("填写域名会同时匹配其子域名。保存后自动过滤新搜索结果，"
-                      "已有结果仅隐藏，不删除；关闭后恢复显示。手动添加也按此规则显示。")
+        note = QLabel("适合填写百度百科、晋江等可信或原创发布网站。域名会同时匹配其子域名。"
+                      "保存后，新搜索会跳过这些网站；已有结果仅隐藏，不删除。")
         note.setWordWrap(True)
         note.setObjectName("muted")
         card.body.addWidget(note)
@@ -124,11 +124,11 @@ class SettingsPage(QWidget):
         )
 
         self.whitelist.setPlaceholderText(
-            "每行一个域名，例如 example.com；也支持逗号分隔或粘贴完整网址"
+            "每行一个域名，例如 baike.baidu.com、jjwxc.net；也支持粘贴完整网址"
         )
 
         form.addRow(
-            "网站白名单",
+            "网站排除名单",
             self.whitelist,
         )
 
@@ -148,10 +148,10 @@ class SettingsPage(QWidget):
         try:
             domains = parse_whitelist(self.whitelist.toPlainText())
         except ValueError as exc:
-            QMessageBox.warning(self, "白名单无效", str(exc))
+            QMessageBox.warning(self, "排除名单无效", str(exc))
             return
         if self.whitelist_enabled.isChecked() and not domains:
-            QMessageBox.warning(self, "白名单为空", "请至少填写一个网站，或关闭白名单。")
+            QMessageBox.warning(self, "排除名单为空", "请至少填写一个网站，或关闭排除名单。")
             return
         self.db.set_setting(
             "whitelist",

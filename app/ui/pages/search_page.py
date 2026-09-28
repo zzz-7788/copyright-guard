@@ -193,6 +193,7 @@ class SearchPage(QWidget):
         self.search_total = 0
         self.search_received = 0
         self.search_filtered = 0
+        self.search_kept = 0
         self.search_errors = {}
 
         outer = QVBoxLayout(self)
@@ -854,6 +855,7 @@ class SearchPage(QWidget):
         self.error_details.hide()
         self.search_received = 0
         self.search_filtered = 0
+        self.search_kept = 0
 
         self.search_total = (
             len(self.active_engines)
@@ -1003,16 +1005,17 @@ class SearchPage(QWidget):
         self.search_received += len(results)
         website_filter = WebsiteFilter.from_database(self.db)
 
-        for result in results:
-            if not website_filter.allows(result.get("url", "")):
-                self.search_filtered += 1
-                continue
+        selected_results, excluded_count = website_filter.select(results, limit=20)
+        self.search_filtered += excluded_count
+
+        for result in selected_results:
             try:
                 self.db.add_result(
                     result
                 )
 
                 saved_count += 1
+                self.search_kept += 1
 
             except Exception as exc:
                 print(
@@ -1273,7 +1276,8 @@ class SearchPage(QWidget):
         self.error_details.setText(detail)
         self.error_details.setVisible(bool(detail))
         self.summary.setText(self.summary.text() +
-            f" · 本轮返回 {self.search_received} 条，白名单过滤 {self.search_filtered} 条")
+            f" · 本轮候选 {self.search_received} 条，排除名单过滤 {self.search_filtered} 条，"
+            f"保留 {self.search_kept} 条")
         self.refresh_results()
         self.changed()
 

@@ -13,17 +13,18 @@ class WebsiteFilterTests(unittest.TestCase):
     def test_boundaries(self):
         f = WebsiteFilter(True, ('example.com',))
         for url in ('https://example.com', 'https://a.example.com/path', 'https://EXAMPLE.COM.:443'):
-            self.assertTrue(f.allows(url), url)
+            self.assertFalse(f.allows(url), url)
         for url in ('https://otherexample.com', 'https://example.com.evil.org',
-                    'https://evil.org/?url=example.com', 'https://example.com@evil.org',
-                    'javascript:example.com', 'https://[broken'):
+                    'https://evil.org/?url=example.com'):
+            self.assertTrue(f.allows(url), url)
+        for url in ('https://example.com@evil.org', 'javascript:example.com', 'https://[broken'):
             self.assertFalse(f.allows(url), url)
 
     def test_invalid_settings(self):
         for entry in ('*', '*.example.com', 'https://', 'bad_domain.com', 'https://example.com:abc'):
             with self.assertRaises(ValueError):
                 parse_whitelist(entry)
-        self.assertFalse(WebsiteFilter(True).allows('https://example.com'))
+        self.assertTrue(WebsiteFilter(True).allows('https://example.com'))
         self.assertTrue(WebsiteFilter().allows('https://anything.org'))
 
     def test_setting_roundtrip(self):
@@ -35,10 +36,24 @@ class WebsiteFilterTests(unittest.TestCase):
             db.set_setting('whitelist', 'example.com')
             db.set_setting('whitelist_enabled', '1')
             f = WebsiteFilter.from_database(Database(db.path))
-            self.assertTrue(f.allows('https://sub.example.com'))
-            self.assertFalse(f.allows('https://other.org'))
+            self.assertFalse(f.allows('https://sub.example.com'))
+            self.assertTrue(f.allows('https://other.org'))
             import gc
             gc.collect()  # Existing Database context managers leave connections for GC.
+
+    def test_selects_twenty_after_exclusions(self):
+        f = WebsiteFilter(True, ('baike.baidu.com', 'jjwxc.net'))
+        results = [
+            {"url": f"https://baike.baidu.com/item/{index}"}
+            for index in range(15)
+        ] + [
+            {"url": f"https://suspect{index}.example/book"}
+            for index in range(35)
+        ]
+        kept, excluded = f.select(results, limit=20)
+        self.assertEqual(len(kept), 20)
+        self.assertEqual(excluded, 15)
+        self.assertTrue(all("baike.baidu.com" not in item["url"] for item in kept))
 
     def test_syntax(self):
         for path in (Path(__file__).parent / 'app').rglob('*.py'):

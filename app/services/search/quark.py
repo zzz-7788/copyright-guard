@@ -114,7 +114,9 @@ class QuarkSearchProvider(SearchProvider):
                     summary=False,
                     rerank_score=True,
                     ),
-                    advanced_params={"numResults": "20"},
+                    # IQS UnifiedSearch 没有传统页码参数；一次取满 50 条候选，
+                    # 由搜索页排除可信/原创站点后保留前 20 条。
+                    advanced_params={"numResults": "50"},
                 )
             )
             response = client.unified_search(request)

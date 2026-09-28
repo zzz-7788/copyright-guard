@@ -1,4 +1,4 @@
-"""Website allowlist parsing and matching, independent of the UI."""
+"""Website exclusion-list parsing and matching, independent of the UI."""
 
 import re
 from urllib.parse import urlsplit
@@ -49,7 +49,7 @@ class WebsiteFilter:
         try:
             return cls(True, parse_whitelist(db.get_setting("whitelist", "")))
         except ValueError:
-            return cls(True)  # Invalid enabled configuration must not allow everything.
+            return cls(True)  # Invalid configuration excludes no valid domain.
 
     def allows(self, url):
         if not self.enabled:
@@ -58,4 +58,15 @@ class WebsiteFilter:
             host = website_host(url)
         except (ValueError, UnicodeError):
             return False
-        return any(host == domain or host.endswith("." + domain) for domain in self.domains)
+        return not any(host == domain or host.endswith("." + domain) for domain in self.domains)
+
+    def select(self, results, limit=20):
+        """Return up to ``limit`` non-excluded results and the excluded count."""
+        kept = []
+        excluded = 0
+        for result in results or []:
+            if not self.allows(result.get("url", "")):
+                excluded += 1
+            elif len(kept) < limit:
+                kept.append(result)
+        return kept, excluded

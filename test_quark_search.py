@@ -46,7 +46,7 @@ class QuarkApiTests(unittest.TestCase):
         request = call.call_args.args[0]
         self.assertEqual(request.body.query, "作品名")
         self.assertEqual(request.body.engine_type, "Generic")
-        self.assertEqual(request.body.advanced_params["numResults"], "20")
+        self.assertEqual(request.body.advanced_params["numResults"], "50")
         self.assertFalse(request.body.contents.main_text)
 
     def test_registry_uses_bound_iqs_service(self):
