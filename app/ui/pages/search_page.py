@@ -1,7 +1,8 @@
+from app.services.search.website_filter import WebsiteFilter
 import webbrowser
 from urllib.parse import urlparse
 from datetime import datetime
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtWidgets import (
     QWidget,QVBoxLayout,QHBoxLayout,QGridLayout,QLabel,QComboBox,QCheckBox,QLineEdit,
     QPushButton,QProgressBar,QScrollArea,QFrame,QMessageBox,QDialog,QFormLayout,QMenu
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
 from app.ui.widgets.common import Card
 from app.services.search.registry import search_provider_registry
 from app.services.search.worker import SearchWorker
+from app.services.search.quark import search_url as quark_search_url
 
 STATUS_LABEL = {"potential":"疑似页面","confirmed":"已确认","ignored":"已忽略","reported":"已举报"}
 
@@ -75,6 +77,8 @@ class ResultCard(QFrame):
         )
 
         title = QLabel(result["title"])
+        title.setTextFormat(Qt.PlainText)
+        title.setWordWrap(True)
         title.setObjectName("resultTitle")
 
         title_row.addWidget(self.select_box)
@@ -83,6 +87,7 @@ class ResultCard(QFrame):
         lay.addLayout(title_row)
 
         url = QLabel(result["url"])
+        url.setTextFormat(Qt.PlainText)
         url.setObjectName("linkLabel")
         url.setWordWrap(True)
         lay.addWidget(url)
@@ -97,6 +102,7 @@ class ResultCard(QFrame):
 
         if result.get("snippet"):
             snippet = QLabel(result["snippet"])
+            snippet.setTextFormat(Qt.PlainText)
             snippet.setObjectName("muted")
             snippet.setWordWrap(True)
             lay.addWidget(snippet)
@@ -185,6 +191,8 @@ class SearchPage(QWidget):
         self.engine_task_errors = {}
 
         self.search_total = 0
+        self.search_received = 0
+        self.search_filtered = 0
         self.search_errors = {}
 
         outer = QVBoxLayout(self)
@@ -261,6 +269,14 @@ class SearchPage(QWidget):
         self.start = QPushButton("开始搜索")
         self.start.setObjectName("primaryButton")
         config.body.addWidget(self.start)
+        self.quark_browser_btn = QPushButton("在浏览器查看夸克搜索")
+        self.quark_browser_btn.clicked.connect(self.open_quark_search)
+        config.body.addWidget(self.quark_browser_btn)
+        search_note = QLabel("夸克：阿里云 IQS 官方 API 搜索，需要绑定 AccessKey。"
+                             "百度：API 搜索；其他预置来源仍为模拟结果。")
+        search_note.setWordWrap(True)
+        search_note.setObjectName("muted")
+        config.body.addWidget(search_note)
         lay.addWidget(config)
 
         activity = Card("SEARCH ACTIVITY")
@@ -275,6 +291,12 @@ class SearchPage(QWidget):
         )
         activity.body.addWidget(self.progress)
         activity.body.addWidget(self.summary)
+        self.error_details = QLabel()
+        self.error_details.setTextFormat(Qt.PlainText)
+        self.error_details.setWordWrap(True)
+        self.error_details.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.error_details.hide()
+        activity.body.addWidget(self.error_details)
         activity.body.addWidget(self.engine_status)
         lay.addWidget(activity)
 
@@ -607,12 +629,14 @@ class SearchPage(QWidget):
         self.work.clear()
         for item in self.db.list_works():
             self.work.addItem(item["title"], item["id"])
-        self.work.blockSignals(False)
         if old:
             idx = self.work.findData(old)
             if idx >= 0:
                 self.work.setCurrentIndex(idx)
-        self.autofill_queries()
+        self.work.blockSignals(False)
+        # Refreshing results must not replace the user's search terms before browsing/retrying.
+        if old != self.work.currentData():
+            self.autofill_queries()
 
 
     def add_query_row(self, text=""):
@@ -726,6 +750,26 @@ class SearchPage(QWidget):
         for i, value in enumerate(values):
             self.queries[i].setText(value)
 
+    def open_quark_search(self):
+        queries = list(dict.fromkeys(edit.text().strip() for edit in self.queries if edit.text().strip()))
+        failed = [query for engine, query in self.search_errors if engine == "夸克"]
+        if not queries:
+            QMessageBox.warning(self, "提示", "请先输入搜索关键词。")
+            return
+        query = next((item for item in failed if item in queries), queries[0])
+        if len(queries) > 1:
+            from PySide6.QtWidgets import QInputDialog
+            query, accepted = QInputDialog.getItem(self, "查看夸克搜索", "选择关键词", queries,
+                                                  queries.index(query), False)
+            if not accepted:
+                return
+        try:
+            url = quark_search_url(query)
+            if not webbrowser.open(url):
+                raise RuntimeError("未能启动默认浏览器，请检查系统默认浏览器设置。")
+        except (ValueError, RuntimeError, webbrowser.Error) as exc:
+            QMessageBox.warning(self, "无法打开夸克搜索", str(exc))
+
     def begin_search(self):
         # ==============================================
         # 收集搜索来源
@@ -797,6 +841,10 @@ class SearchPage(QWidget):
         self.finished_tasks = set()
 
         self.search_errors = {}
+        self.error_details.clear()
+        self.error_details.hide()
+        self.search_received = 0
+        self.search_filtered = 0
 
         self.search_total = (
             len(self.active_engines)
@@ -942,8 +990,13 @@ class SearchPage(QWidget):
         """
 
         saved_count = 0
+        self.search_received += len(results)
+        website_filter = WebsiteFilter.from_database(self.db)
 
         for result in results:
+            if not website_filter.allows(result.get("url", "")):
+                self.search_filtered += 1
+                continue
             try:
                 self.db.add_result(
                     result
@@ -1205,6 +1258,12 @@ class SearchPage(QWidget):
                 f"已保存 {count} 个页面"
             )
 
+        detail = "\n".join(f"{engine} / {query}：{message}"
+                           for (engine, query), message in self.search_errors.items())
+        self.error_details.setText(detail)
+        self.error_details.setVisible(bool(detail))
+        self.summary.setText(self.summary.text() +
+            f" · 本轮返回 {self.search_received} 条，白名单过滤 {self.search_filtered} 条")
         self.refresh_results()
         self.changed()
 
@@ -1238,10 +1297,14 @@ class SearchPage(QWidget):
         )
 
         self.visible_result_ids = []
+        website_filter = WebsiteFilter.from_database(self.db)
 
         for result in self.db.list_results(
             self.work.currentData()
         ):
+            if not website_filter.allows(result["url"]):
+                self.selected_result_ids.discard(result["id"])
+                continue
             if (
                 status != "all"
                 and result["status"] != status

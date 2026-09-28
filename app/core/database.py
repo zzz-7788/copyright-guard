@@ -149,6 +149,9 @@ class Database:
 
                     api_key TEXT DEFAULT '',
 
+                    -- Providers such as Alibaba Cloud IQS require a key pair.
+                    api_secret TEXT DEFAULT '',
+
                     endpoint TEXT DEFAULT '',
 
                     -- none / bearer / api_key
@@ -202,6 +205,15 @@ class Database:
         """
 
         with self.connect() as con:
+            api_columns = {
+                row["name"]
+                for row in con.execute("PRAGMA table_info(api_services)")
+            }
+            if "api_secret" not in api_columns:
+                con.execute(
+                    "ALTER TABLE api_services ADD COLUMN api_secret TEXT DEFAULT ''"
+                )
+
             indexes = con.execute(
                 "PRAGMA index_list(search_results)"
             ).fetchall()
@@ -1612,12 +1624,13 @@ class Database:
                     name,
                     provider_type,
                     api_key,
+                    api_secret,
                     endpoint,
                     auth_type,
                     enabled,
                     created_at
                 )
-                VALUES(?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?)
                 """,
                 (
                     data.get(
@@ -1630,6 +1643,10 @@ class Database:
                     ),
                     data.get(
                         "api_key",
+                        "",
+                    ),
+                    data.get(
+                        "api_secret",
                         "",
                     ),
                     data.get(
@@ -1665,6 +1682,7 @@ class Database:
                     name=?,
                     provider_type=?,
                     api_key=?,
+                    api_secret=?,
                     endpoint=?,
                     auth_type=?,
                     enabled=?
@@ -1678,6 +1696,10 @@ class Database:
                     ),
                     data.get(
                         "api_key",
+                        "",
+                    ),
+                    data.get(
+                        "api_secret",
                         "",
                     ),
                     data.get(

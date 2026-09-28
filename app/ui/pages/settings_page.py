@@ -1,3 +1,4 @@
+from app.services.search.website_filter import parse_whitelist
 from PySide6.QtCore import Qt
 
 from PySide6.QtWidgets import (
@@ -5,6 +6,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QFormLayout,
     QCheckBox,
@@ -102,17 +104,27 @@ class SettingsPage(QWidget):
 
         card = Card("Websites / 网站")
 
+        self.whitelist_enabled = QCheckBox("启用白名单：只保留名单内的网站")
+        self.whitelist_enabled.setChecked(
+            self.db.get_setting("whitelist_enabled", "0") == "1"
+        )
+        card.body.addWidget(self.whitelist_enabled)
+        note = QLabel("填写域名会同时匹配其子域名。保存后自动过滤新搜索结果，"
+                      "已有结果仅隐藏，不删除；关闭后恢复显示。手动添加也按此规则显示。")
+        note.setWordWrap(True)
+        note.setObjectName("muted")
+        card.body.addWidget(note)
         form = QFormLayout()
 
-        self.whitelist = QLineEdit(
+        self.whitelist = QPlainTextEdit(
             self.db.get_setting(
                 "whitelist",
-                "example.org",
+                "",
             )
         )
 
         self.whitelist.setPlaceholderText(
-            "example.org, mysite.com"
+            "每行一个域名，例如 example.com；也支持逗号分隔或粘贴完整网址"
         )
 
         form.addRow(
@@ -133,11 +145,21 @@ class SettingsPage(QWidget):
         layout.addStretch()
 
     def save_websites(self):
+        try:
+            domains = parse_whitelist(self.whitelist.toPlainText())
+        except ValueError as exc:
+            QMessageBox.warning(self, "白名单无效", str(exc))
+            return
+        if self.whitelist_enabled.isChecked() and not domains:
+            QMessageBox.warning(self, "白名单为空", "请至少填写一个网站，或关闭白名单。")
+            return
         self.db.set_setting(
             "whitelist",
-            self.whitelist.text().strip(),
+            "\n".join(domains),
         )
 
+        self.db.set_setting("whitelist_enabled", "1" if self.whitelist_enabled.isChecked() else "0")
+        self.whitelist.setPlainText("\n".join(domains))
         QMessageBox.information(
             self,
             "已保存",

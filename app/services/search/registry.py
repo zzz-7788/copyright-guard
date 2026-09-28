@@ -3,6 +3,7 @@ from typing import Dict, Type
 from .base import SearchProvider
 from .mock import MockSearchProvider
 from .baidu import BaiduSearchProvider
+from .quark import QuarkSearchProvider
 
 
 SEARCH_ENGINES = [
@@ -104,6 +105,13 @@ class SearchProviderRegistry:
                                 ),
                             )
 
+                        if provider_type == "quark_iqs":
+                            return QuarkSearchProvider(
+                                access_key_id=service.get("api_key", ""),
+                                access_key_secret=service.get("api_secret", ""),
+                                endpoint=service.get("endpoint", ""),
+                            )
+
         # ==========================================
         # 静态 Registry 回退
         # ==========================================
@@ -202,6 +210,10 @@ class SearchProviderRegistry:
                             and service.get(
                                 "api_key"
                             )
+                            and (
+                                service.get("provider_type") != "quark_iqs"
+                                or service.get("api_secret")
+                            )
                         ),
                     "is_real":
                         bool(service),
@@ -291,3 +303,5 @@ search_provider_registry.register(
     "百度",
     BaiduSearchProvider,
 )
+
+search_provider_registry.register("夸克", QuarkSearchProvider)

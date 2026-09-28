@@ -40,3 +40,6 @@ Thumbs.db
 # Accidental local files
 python
 UNIQUE(work_id
+
+# User exports
+CopyrightGuard_举报池_*.xlsx

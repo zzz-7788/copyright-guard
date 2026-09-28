@@ -583,6 +583,10 @@ class SearchSourcesTab(QWidget):
             "Provider 执行真实搜索。"
         )
 
+        if source.get("name") == "夸克":
+            note.setText("夸克请绑定 Provider 为“Quark IQS Search API”的服务。"
+                         "该接口使用阿里云 AccessKey ID 和 AccessKey Secret。")
+
         note.setObjectName(
             "muted"
         )

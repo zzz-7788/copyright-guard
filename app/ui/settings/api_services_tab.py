@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from app.ui.widgets.common import Card
 from app.services.search.baidu import BaiduSearchProvider
+from app.services.search.quark import QuarkSearchProvider, DEFAULT_ENDPOINT
 
 
 class ApiServicesTab(QWidget):
@@ -344,10 +345,14 @@ class ApiServicesTab(QWidget):
             "Baidu Search API",
             "baidu",
         )
+        provider.addItem(
+            "Quark IQS Search API",
+            "quark_iqs",
+        )
 
         endpoint = QLineEdit()
         endpoint.setPlaceholderText(
-            "https://api.example.com/search"
+            "夸克 IQS 默认：iqs.cn-zhangjiakou.aliyuncs.com"
         )
 
         api_key = QLineEdit()
@@ -355,8 +360,12 @@ class ApiServicesTab(QWidget):
             QLineEdit.Password
         )
         api_key.setPlaceholderText(
-            "输入 API Key"
+            "API Key；夸克 IQS 填 AccessKey ID"
         )
+
+        api_secret = QLineEdit()
+        api_secret.setEchoMode(QLineEdit.Password)
+        api_secret.setPlaceholderText("夸克 IQS 填 AccessKey Secret")
 
         show_key = QCheckBox(
             "显示 API Key"
@@ -367,6 +376,9 @@ class ApiServicesTab(QWidget):
                 QLineEdit.Normal
                 if checked
                 else QLineEdit.Password
+            )
+            api_secret.setEchoMode(
+                QLineEdit.Normal if checked else QLineEdit.Password
             )
 
         show_key.toggled.connect(
@@ -408,6 +420,10 @@ class ApiServicesTab(QWidget):
             api_key,
         )
         form.addRow(
+            "API Secret",
+            api_secret,
+        )
+        form.addRow(
             "",
             show_key,
         )
@@ -423,10 +439,10 @@ class ApiServicesTab(QWidget):
         layout.addLayout(form)
 
         note = QLabel(
-            "注意：V0.2 当前会将 API Key "
+            "注意：V0.2 当前会将 API Key / Secret "
             "保存在本机 SQLite。"
             "输入框隐藏并不代表数据库中的 "
-            "Key 已加密。"
+            "凭据已加密。"
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
@@ -476,6 +492,9 @@ class ApiServicesTab(QWidget):
 
                     "api_key":
                         api_key.text().strip(),
+
+                    "api_secret":
+                        api_secret.text().strip(),
 
                     "endpoint":
                         endpoint.text().strip(),
@@ -553,6 +572,10 @@ class ApiServicesTab(QWidget):
             "Baidu Search API",
             "baidu",
         )
+        provider.addItem(
+            "Quark IQS Search API",
+            "quark_iqs",
+        )
 
         provider_index = (
             provider.findData(
@@ -586,6 +609,11 @@ class ApiServicesTab(QWidget):
             QLineEdit.Password
         )
 
+        api_secret = QLineEdit(
+            service.get("api_secret", "")
+        )
+        api_secret.setEchoMode(QLineEdit.Password)
+
         show_key = QCheckBox(
             "显示 API Key"
         )
@@ -595,6 +623,9 @@ class ApiServicesTab(QWidget):
                 QLineEdit.Normal
                 if checked
                 else QLineEdit.Password
+            )
+            api_secret.setEchoMode(
+                QLineEdit.Normal if checked else QLineEdit.Password
             )
 
         show_key.toggled.connect(
@@ -655,6 +686,10 @@ class ApiServicesTab(QWidget):
             api_key,
         )
         form.addRow(
+            "API Secret",
+            api_secret,
+        )
+        form.addRow(
             "",
             show_key,
         )
@@ -670,7 +705,7 @@ class ApiServicesTab(QWidget):
         layout.addLayout(form)
 
         note = QLabel(
-            "API Key 当前保存在本机 SQLite 中，"
+            "API Key / Secret 当前保存在本机 SQLite 中，"
             "输入框隐藏不代表数据库内容已经加密。"
         )
         note.setObjectName("muted")
@@ -722,6 +757,9 @@ class ApiServicesTab(QWidget):
 
                     "api_key":
                         api_key.text().strip(),
+
+                    "api_secret":
+                        api_secret.text().strip(),
 
                     "endpoint":
                         endpoint.text().strip(),
@@ -827,6 +865,29 @@ class ApiServicesTab(QWidget):
                     f"{len(results)} "
                     "个搜索结果。"
                 ),
+            )
+            return
+
+        if provider_type == "quark_iqs":
+            try:
+                provider = QuarkSearchProvider(
+                    access_key_id=service.get("api_key", ""),
+                    access_key_secret=service.get("api_secret", ""),
+                    endpoint=service.get("endpoint", "") or DEFAULT_ENDPOINT,
+                )
+                results = provider.search("Copyright Guard 测试")
+            except Exception as exc:
+                QMessageBox.critical(
+                    self,
+                    "连接失败",
+                    f"夸克 IQS 搜索 API 测试失败：\n\n{exc}",
+                )
+                return
+
+            QMessageBox.information(
+                self,
+                "连接成功",
+                f"夸克 IQS 搜索 API 可以正常访问。\n\n本次返回 {len(results)} 个搜索结果。",
             )
             return
 
