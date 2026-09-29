@@ -111,12 +111,12 @@ class ResultCard(QFrame):
         open_btn = QPushButton("打开页面")
         mark_btn = QPushButton("标记")
         report_btn = QPushButton("加入举报池")
-        delete_btn = QPushButton("删除")
+        confirm_safe_btn = QPushButton("确认非盗文")
         open_btn.clicked.connect(lambda: webbrowser.open(result["url"]))
         mark_btn.clicked.connect(self.show_mark_menu)
         report_btn.clicked.connect(self.report)
-        delete_btn.clicked.connect(self.delete)
-        for btn in [open_btn,mark_btn,report_btn,delete_btn]:
+        confirm_safe_btn.clicked.connect(self.confirm_non_infringing)
+        for btn in [open_btn,mark_btn,report_btn,confirm_safe_btn]:
             row.addWidget(btn)
         lay.addLayout(row)
 
@@ -147,10 +147,15 @@ class ResultCard(QFrame):
         )
 
         self.page.changed()
+        self.page.refresh_results()
 
-    def delete(self):
-        if QMessageBox.question(self,"删除","确定删除这个页面记录吗？") == QMessageBox.Yes:
-            self.page.db.delete_result(self.result["id"])
+    def confirm_non_infringing(self):
+        if QMessageBox.question(
+            self,
+            "确认非盗文",
+            "确认这个页面不是盗文吗？\n\n确认后会移入“已确认”。",
+        ) == QMessageBox.Yes:
+            self.page.db.update_result_status(self.result["id"], "confirmed")
             self.page.refresh_results()
             self.page.changed()
 

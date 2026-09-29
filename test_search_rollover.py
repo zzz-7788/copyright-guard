@@ -46,7 +46,7 @@ class SearchRolloverTests(unittest.TestCase):
         self.assertEqual(self.db.ignore_unpooled_results(self.work["id"]), 1)
         rows = {row["id"]: row for row in self.db.list_results(self.work["id"])}
         self.assertEqual(rows[unpooled]["status"], "ignored")
-        self.assertEqual(rows[pooled]["status"], "potential")
+        self.assertEqual(rows[pooled]["status"], "confirmed")
         self.assertEqual(rows[already_ignored]["status"], "ignored")
 
     def test_other_work_is_untouched(self):
@@ -70,6 +70,16 @@ class SearchRolloverTests(unittest.TestCase):
         window.close()
         window.deleteLater()
         self.app.processEvents()
+
+    def test_report_pool_status_updates_search_result(self):
+        result_id = self.add_result("reported")
+        pool_id = self.db.add_result_to_report_pool(result_id)
+        rows = {row["id"]: row for row in self.db.list_results(self.work["id"])}
+        self.assertEqual(rows[result_id]["status"], "confirmed")
+
+        self.db.update_report_pool_status(pool_id, "submitted")
+        rows = {row["id"]: row for row in self.db.list_results(self.work["id"])}
+        self.assertEqual(rows[result_id]["status"], "reported")
 
 
 if __name__ == "__main__":

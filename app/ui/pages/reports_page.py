@@ -652,6 +652,10 @@ class ReportsPage(QWidget):
             "移出举报池"
         )
 
+        reported_btn = QPushButton(
+            "标记已举报"
+        )
+
         open_btn.clicked.connect(
             lambda checked=False,
             u=item["url"]:
@@ -666,9 +670,20 @@ class ReportsPage(QWidget):
             )
         )
 
+        reported_btn.clicked.connect(
+            lambda checked=False,
+            pool_id=item["id"]:
+            self.mark_reported(pool_id)
+        )
+
         row.addWidget(
             open_btn
         )
+
+        if item["status"] != "submitted":
+            row.addWidget(
+                reported_btn
+            )
 
         row.addWidget(
             remove_btn
@@ -679,6 +694,17 @@ class ReportsPage(QWidget):
         )
 
         return frame
+
+    def mark_reported(self, pool_id):
+        answer = QMessageBox.question(
+            self,
+            "标记已举报",
+            "确认这个页面已经完成举报吗？",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self.db.update_report_pool_status(pool_id, "submitted")
+        self.refresh()
 
     # =============================================
     # 修改单条平台

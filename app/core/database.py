@@ -1351,7 +1351,7 @@ class Database:
                 )
             )
 
-        return self.add_to_report_pool(
+        pool_id = self.add_to_report_pool(
             work_id=result["work_id"],
             url=result["url"],
             result_id=result["id"],
@@ -1359,6 +1359,9 @@ class Database:
             platform=platform,
             source_type="search",
         )
+        if pool_id is not None:
+            self.update_result_status(result["id"], "confirmed")
+        return pool_id
 
     def add_results_to_report_pool(
         self,
@@ -1497,6 +1500,10 @@ class Database:
         status,
     ):
         with self.connect() as con:
+            item = con.execute(
+                "SELECT result_id FROM report_pool WHERE id=?",
+                (pool_id,),
+            ).fetchone()
             con.execute(
                 """
                 UPDATE report_pool
@@ -1508,6 +1515,11 @@ class Database:
                     pool_id,
                 ),
             )
+            if status == "submitted" and item and item["result_id"]:
+                con.execute(
+                    "UPDATE search_results SET status='reported' WHERE id=?",
+                    (item["result_id"],),
+                )
 
     def delete_report_pool_item(
         self,
