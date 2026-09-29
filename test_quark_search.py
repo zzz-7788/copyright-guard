@@ -30,24 +30,31 @@ class QuarkApiTests(unittest.TestCase):
         }])
 
     def test_credentials_required(self):
-        with self.assertRaisesRegex(RuntimeError, "AccessKey"):
+        with self.assertRaisesRegex(RuntimeError, "API Key"):
             QuarkSearchProvider().search("作品名")
 
-    def test_sdk_request_and_response(self):
-        provider = QuarkSearchProvider("id", "secret")
+    def test_legacy_endpoint_migrates_to_http_api(self):
+        provider = QuarkSearchProvider("api-key", "iqs.cn-zhangjiakou.aliyuncs.com")
+        self.assertEqual(provider.endpoint, "https://cloud-iqs.aliyuncs.com/search/unified")
+
+    def test_http_request_and_response(self):
+        provider = QuarkSearchProvider("api-key")
         response = Mock()
-        response.body.page_items = [Mock(
-            title="作品", link="https://example.com/book", snippet="摘要", summary=None
-        )]
-        with patch("alibabacloud_iqs20241111.client.Client.unified_search",
-                   return_value=response) as call:
+        response.status_code = 200
+        response.json.return_value = {"pageItems": [{
+            "title": "作品", "link": "https://example.com/book", "snippet": "摘要"
+        }]}
+        with patch("app.services.search.quark.requests.post", return_value=response) as call:
             results = provider.search("作品名")
         self.assertEqual(results[0]["url"], "https://example.com/book")
-        request = call.call_args.args[0]
-        self.assertEqual(request.body.query, "作品名")
-        self.assertEqual(request.body.engine_type, "Generic")
-        self.assertEqual(request.body.advanced_params["numResults"], "50")
-        self.assertFalse(request.body.contents.main_text)
+        self.assertEqual(call.call_args.args[0], "https://cloud-iqs.aliyuncs.com/search/unified")
+        self.assertEqual(call.call_args.kwargs["headers"]["Authorization"], "Bearer api-key")
+        payload = call.call_args.kwargs["json"]
+        self.assertEqual(payload["query"], "作品名")
+        self.assertEqual(payload["engineType"], "GenericAdvanced")
+        self.assertEqual(payload["advancedParams"]["numResults"], "50")
+        self.assertFalse(payload["contents"]["mainText"])
+        self.assertFalse(payload["contents"]["summary"])
 
     def test_registry_uses_bound_iqs_service(self):
         db = Mock()
@@ -56,21 +63,21 @@ class QuarkApiTests(unittest.TestCase):
         }]
         db.get_api_service.return_value = {
             "id": 7, "provider_type": "quark_iqs", "enabled": 1,
-            "api_key": "id", "api_secret": "secret", "endpoint": "",
+            "api_key": "api-key", "api_secret": "", "endpoint": "",
         }
         provider = search_provider_registry.get("夸克", db)
         self.assertIsInstance(provider, QuarkSearchProvider)
-        self.assertEqual(provider.access_key_id, "id")
-        self.assertEqual(provider.access_key_secret, "secret")
+        self.assertEqual(provider.api_key, "api-key")
+        self.assertEqual(provider.endpoint, "https://cloud-iqs.aliyuncs.com/search/unified")
 
-    def test_database_secret_roundtrip(self):
+    def test_database_api_key_roundtrip(self):
         with tempfile.TemporaryDirectory() as folder:
             db = Database(Path(folder) / "test.db")
             service_id = db.add_api_service({
                 "name": "Quark", "provider_type": "quark_iqs",
-                "api_key": "id", "api_secret": "secret", "enabled": True,
+                "api_key": "api-key", "api_secret": "", "enabled": True,
             })
-            self.assertEqual(db.get_api_service(service_id)["api_secret"], "secret")
+            self.assertEqual(db.get_api_service(service_id)["api_key"], "api-key")
             del db
             gc.collect()
 

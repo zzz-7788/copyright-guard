@@ -1,15 +1,18 @@
-"""Official Alibaba Cloud IQS web search provider backed by Quark search."""
+"""CleverSee web search provider using Quark-oriented GenericAdvanced sources."""
 
 import os
 import re
 from html import unescape
 from urllib.parse import urlsplit
 
+import requests
+
 from .base import SearchProvider
 from app.utils.url_utils import normalize_url
 
 
-DEFAULT_ENDPOINT = "iqs.cn-zhangjiakou.aliyuncs.com"
+DEFAULT_ENDPOINT = "https://cloud-iqs.aliyuncs.com/search/unified"
+LEGACY_ENDPOINT = "iqs.cn-zhangjiakou.aliyuncs.com"
 
 
 def _plain_text(value):
@@ -18,17 +21,11 @@ def _plain_text(value):
     return unescape(re.sub(r"<[^>]+>", "", str(value))).strip()
 
 
-def _value(item, name, default=None):
-    if isinstance(item, dict):
-        return item.get(name, default)
-    return getattr(item, name, default)
-
-
 def parse_iqs_results(items):
     results = []
     seen = set()
     for item in items or []:
-        raw_url = str(_value(item, "link", "") or "").strip()
+        raw_url = str(item.get("link", "") or "").strip()
         try:
             url = normalize_url(raw_url)
             parts = urlsplit(url)
@@ -39,11 +36,11 @@ def parse_iqs_results(items):
         if parts.username or parts.password or url in seen:
             continue
         results.append({
-            "title": _plain_text(_value(item, "title", "")) or url,
+            "title": _plain_text(item.get("title", "")) or url,
             "url": url,
             "domain": parts.hostname.lower(),
             "snippet": _plain_text(
-                _value(item, "snippet", "") or _value(item, "summary", "")
+                item.get("snippet", "") or item.get("summary", "")
             )[:1000],
         })
         seen.add(url)
@@ -51,74 +48,75 @@ def parse_iqs_results(items):
 
 
 class QuarkSearchProvider(SearchProvider):
-    """Call Alibaba Cloud Information Query Service UnifiedSearch API."""
+    """Call CleverSee UnifiedSearch with the Quark-oriented advanced engine."""
 
-    name = "夸克"
+    name = "夸克信源（CleverSee）"
     provider_type = "quark_iqs"
     requires_api_key = True
     is_real = True
-    credential_key = "aliyun_iqs_access_key"
+    credential_key = "cleversee_api_key"
 
-    def __init__(self, access_key_id=None, access_key_secret=None, endpoint=None):
-        self.access_key_id = (
-            access_key_id or os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID", "")
+    def __init__(self, api_key=None, endpoint=None):
+        self.api_key = (
+            api_key
+            or os.getenv("CLEVERSEE_API_KEY", "")
+            or os.getenv("ALIYUN_IQS_API_KEY", "")
         ).strip()
-        self.access_key_secret = (
-            access_key_secret or os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "")
-        ).strip()
-        self.endpoint = (endpoint or DEFAULT_ENDPOINT).strip()
+        configured_endpoint = (endpoint or "").strip()
+        self.endpoint = (
+            DEFAULT_ENDPOINT
+            if not configured_endpoint or configured_endpoint == LEGACY_ENDPOINT
+            else configured_endpoint
+        )
 
     def search(self, query, work=None):
         query = query.strip()
         if not query:
             return []
         if len(query) > 500:
-            raise ValueError("夸克 IQS 搜索关键词不能超过 500 个字符。")
-        if not self.access_key_id or not self.access_key_secret:
+            raise ValueError("夸克信源搜索关键词不能超过 500 个字符。")
+        if not self.api_key:
             raise RuntimeError(
-                "未配置夸克 IQS 的 AccessKey ID 和 AccessKey Secret。"
-                "请在设置 → API 服务中添加“夸克 IQS 搜索”，再绑定到夸克来源。"
+                "未配置 CleverSee API Key。"
+                "请在设置 → API 服务中添加“夸克信源（CleverSee）”，再绑定到夸克来源。"
             )
-        try:
-            from alibabacloud_iqs20241111 import models
-            from alibabacloud_iqs20241111.client import Client
-            from alibabacloud_tea_openapi import models as open_api_models
-        except ImportError as exc:
-            raise RuntimeError(
-                "缺少阿里云 IQS SDK，请重新安装 requirements.txt 或使用新版 EXE。"
-            ) from exc
+
+        payload = {
+            "query": query,
+            "engineType": "GenericAdvanced",
+            "timeRange": "NoLimit",
+            "contents": {
+                "mainText": False,
+                "markdownText": False,
+                "richMainBody": False,
+                "summary": False,
+                "rerankScore": True,
+            },
+            "advancedParams": {"numResults": "50"},
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
 
         try:
-            config = open_api_models.Config(
-                access_key_id=self.access_key_id,
-                access_key_secret=self.access_key_secret,
+            response = requests.post(
+                self.endpoint,
+                headers=headers,
+                json=payload,
+                timeout=30,
             )
-            config.endpoint = self.endpoint
-            client = Client(config)
-            request = models.UnifiedSearchRequest(
-                body=models.UnifiedSearchInput(
-                    query=query,
-                    engine_type="Generic",
-                    time_range="NoLimit",
-                    contents=models.RequestContents(
-                    main_text=False,
-                    markdown_text=False,
-                    rich_main_body=False,
-                    summary=False,
-                    rerank_score=True,
-                    ),
-                    # IQS UnifiedSearch 没有传统页码参数；一次取满 50 条候选，
-                    # 由搜索页排除可信/原创站点后保留前 20 条。
-                    advanced_params={"numResults": "50"},
-                )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"CleverSee 搜索网络请求失败：{exc}") from exc
+
+        if response.status_code not in (200, 201):
+            raise RuntimeError(
+                "CleverSee 搜索 API 请求失败："
+                f"HTTP {response.status_code} {response.text[:300]}"
             )
-            response = client.unified_search(request)
-            return parse_iqs_results(_value(response.body, "page_items", []))
-        except Exception as exc:
-            code = getattr(exc, "code", "")
-            data = getattr(exc, "data", None) or {}
-            message = data.get("message") if isinstance(data, dict) else ""
-            detail = message or str(exc)
-            if code:
-                detail = f"{code}: {detail}"
-            raise RuntimeError(f"夸克 IQS 搜索 API 请求失败：{detail}") from exc
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise RuntimeError("CleverSee 搜索 API 返回了无效 JSON。") from exc
+
+        return parse_iqs_results(data.get("pageItems", []))

@@ -346,13 +346,13 @@ class ApiServicesTab(QWidget):
             "baidu",
         )
         provider.addItem(
-            "Quark IQS Search API",
+            "Quark Source (CleverSee) API",
             "quark_iqs",
         )
 
         endpoint = QLineEdit()
         endpoint.setPlaceholderText(
-            "夸克 IQS 默认：iqs.cn-zhangjiakou.aliyuncs.com"
+            "CleverSee 默认：https://cloud-iqs.aliyuncs.com/search/unified"
         )
 
         api_key = QLineEdit()
@@ -360,12 +360,12 @@ class ApiServicesTab(QWidget):
             QLineEdit.Password
         )
         api_key.setPlaceholderText(
-            "API Key；夸克 IQS 填 AccessKey ID"
+            "百度或 CleverSee 控制台生成的 API Key"
         )
 
         api_secret = QLineEdit()
         api_secret.setEchoMode(QLineEdit.Password)
-        api_secret.setPlaceholderText("夸克 IQS 填 AccessKey Secret")
+        api_secret.setPlaceholderText("CleverSee 和百度不需要填写")
 
         show_key = QCheckBox(
             "显示 API Key"
@@ -573,7 +573,7 @@ class ApiServicesTab(QWidget):
             "baidu",
         )
         provider.addItem(
-            "Quark IQS Search API",
+            "Quark Source (CleverSee) API",
             "quark_iqs",
         )
 
@@ -613,6 +613,7 @@ class ApiServicesTab(QWidget):
             service.get("api_secret", "")
         )
         api_secret.setEchoMode(QLineEdit.Password)
+        api_secret.setPlaceholderText("CleverSee 和百度不需要填写")
 
         show_key = QCheckBox(
             "显示 API Key"
@@ -871,8 +872,7 @@ class ApiServicesTab(QWidget):
         if provider_type == "quark_iqs":
             try:
                 provider = QuarkSearchProvider(
-                    access_key_id=service.get("api_key", ""),
-                    access_key_secret=service.get("api_secret", ""),
+                    api_key=service.get("api_key", ""),
                     endpoint=service.get("endpoint", "") or DEFAULT_ENDPOINT,
                 )
                 results = provider.search("Copyright Guard 测试")
@@ -880,14 +880,14 @@ class ApiServicesTab(QWidget):
                 QMessageBox.critical(
                     self,
                     "连接失败",
-                    f"夸克 IQS 搜索 API 测试失败：\n\n{exc}",
+                    f"夸克信源（CleverSee）API 测试失败：\n\n{exc}",
                 )
                 return
 
             QMessageBox.information(
                 self,
                 "连接成功",
-                f"夸克 IQS 搜索 API 可以正常访问。\n\n本次返回 {len(results)} 个搜索结果。",
+                f"夸克信源（CleverSee）API 可以正常访问。\n\n本次返回 {len(results)} 个搜索结果。",
             )
             return
 

@@ -269,7 +269,7 @@ class SearchPage(QWidget):
         self.start = QPushButton("开始搜索")
         self.start.setObjectName("primaryButton")
         config.body.addWidget(self.start)
-        search_note = QLabel("夸克：阿里云 IQS 官方 API 搜索，需要绑定 AccessKey。"
+        search_note = QLabel("夸克：CleverSee GenericAdvanced API 搜索，需要绑定 API Key。"
                              "百度：API 搜索；其他预置来源仍为模拟结果。")
         search_note.setWordWrap(True)
         search_note.setObjectName("muted")

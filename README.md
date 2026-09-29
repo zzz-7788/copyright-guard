@@ -200,20 +200,19 @@ copyright_guard/
 搜索页默认只显示“疑似页面”。同一作品再次开始搜索时，上一批尚未加入举报池的结果会自动标记为“已忽略”；
 已经加入举报池的结果和其他作品的结果不会被修改。需要复查旧结果时，可将状态筛选切换为“已忽略”或“全部”。
 
-### 夸克 API 搜索
+### 夸克信源（CleverSee）API 搜索
 
-夸克搜索使用阿里云“信息查询服务 IQS”的 UnifiedSearch 官方接口，不再抓取夸克网页。
+夸克来源使用阿里云 CleverSee/IQS 的 `GenericAdvanced` 联网搜索接口，不抓取夸克网页。
 
-1. 在阿里云开通信息查询服务 IQS，并为 RAM 用户授予 `AliyunIQSFullAccess` 或所需最小权限。
-2. 在「设置 → API 服务」添加服务，Provider 选择 `Quark IQS Search API`。
-3. API Key 填 AccessKey ID，API Secret 填 AccessKey Secret。Endpoint 留空时使用
-   `iqs.cn-zhangjiakou.aliyuncs.com`，保存后可点击「测试」。
+1. 在阿里云 CleverSee/IQS 控制台开通联网搜索，并创建 API Key。
+2. 在「设置 → API 服务」添加服务，Provider 选择 `Quark Source (CleverSee) API`。
+3. 只在 API Key 中填写控制台生成的密钥，API Secret 留空。Endpoint 留空时使用
+   `https://cloud-iqs.aliyuncs.com/search/unified`，保存后可点击「测试」。
 4. 在「设置 → 搜索来源」配置“夸克”，绑定刚创建的 API 服务并启用。
 5. 在「搜索」勾选夸克后搜索。结果会先经过网站排除名单，再保存到结果列表。
 
 夸克与百度采用相同的操作流程：点击“开始搜索”后调用 API，返回结果直接显示在下方疑似页面列表中。
 
-当前使用 `Generic` 引擎，每个关键词请求 50 条候选结果，排除名单域名后最多保留 20 条；不请求网页正文和增强摘要。
-IQS UnifiedSearch 没有传统页码参数，因此不足 20 条时不会抓取搜索网页翻页，也不会绕过反爬限制。
-实际可用额度、计费和限流由阿里云 IQS 服务决定。AccessKey ID 与 Secret 当前保存在本机 SQLite，尚未加密。
-源码依赖 `alibabacloud_iqs20241111==1.6.2`，旧 EXE 需要重新打包。
+当前使用 `GenericAdvanced` 引擎，每个关键词请求约 50 条候选结果，排除名单域名后最多保留 20 条；
+不请求网页正文和增强摘要。实际可用额度、计费和限流由阿里云 CleverSee 服务决定。
+API Key 当前保存在本机 SQLite，尚未加密，请勿上传数据库文件。

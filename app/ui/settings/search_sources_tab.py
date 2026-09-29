@@ -584,8 +584,8 @@ class SearchSourcesTab(QWidget):
         )
 
         if source.get("name") == "夸克":
-            note.setText("夸克请绑定 Provider 为“Quark IQS Search API”的服务。"
-                         "该接口使用阿里云 AccessKey ID 和 AccessKey Secret。")
+            note.setText("夸克请绑定 Provider 为“Quark Source (CleverSee) API”的服务。"
+                         "该接口只需填写 CleverSee 控制台生成的一个 API Key。")
 
         note.setObjectName(
             "muted"

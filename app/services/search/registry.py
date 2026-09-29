@@ -107,8 +107,7 @@ class SearchProviderRegistry:
 
                         if provider_type == "quark_iqs":
                             return QuarkSearchProvider(
-                                access_key_id=service.get("api_key", ""),
-                                access_key_secret=service.get("api_secret", ""),
+                                api_key=service.get("api_key", ""),
                                 endpoint=service.get("endpoint", ""),
                             )
 
@@ -209,10 +208,6 @@ class SearchProviderRegistry:
                             service
                             and service.get(
                                 "api_key"
-                            )
-                            and (
-                                service.get("provider_type") != "quark_iqs"
-                                or service.get("api_secret")
                             )
                         ),
                     "is_real":
