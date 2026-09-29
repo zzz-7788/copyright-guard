@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
 from app.ui.widgets.common import Card
 from app.services.search.registry import search_provider_registry
 from app.services.search.worker import SearchWorker
-from app.services.search.quark import search_url as quark_search_url
 
 STATUS_LABEL = {"potential":"疑似页面","confirmed":"已确认","ignored":"已忽略","reported":"已举报"}
 
@@ -270,9 +269,6 @@ class SearchPage(QWidget):
         self.start = QPushButton("开始搜索")
         self.start.setObjectName("primaryButton")
         config.body.addWidget(self.start)
-        self.quark_browser_btn = QPushButton("在浏览器查看夸克搜索")
-        self.quark_browser_btn.clicked.connect(self.open_quark_search)
-        config.body.addWidget(self.quark_browser_btn)
         search_note = QLabel("夸克：阿里云 IQS 官方 API 搜索，需要绑定 AccessKey。"
                              "百度：API 搜索；其他预置来源仍为模拟结果。")
         search_note.setWordWrap(True)
@@ -753,27 +749,6 @@ class SearchPage(QWidget):
         # 用户自己添加的第 4、5、6... 个不会被覆盖。
         for i, value in enumerate(values):
             self.queries[i].setText(value)
-
-    def open_quark_search(self):
-        queries = list(dict.fromkeys(edit.text().strip() for edit in self.queries if edit.text().strip()))
-        failed = [query for engine, query in self.search_errors if engine == "夸克"]
-        if not queries:
-            QMessageBox.warning(self, "提示", "请先输入搜索关键词。")
-            return
-
-        query = next((item for item in failed if item in queries), queries[0])
-        if len(queries) > 1:
-            from PySide6.QtWidgets import QInputDialog
-            query, accepted = QInputDialog.getItem(self, "查看夸克搜索", "选择关键词", queries,
-                                                  queries.index(query), False)
-            if not accepted:
-                return
-        try:
-            url = quark_search_url(query)
-            if not webbrowser.open(url):
-                raise RuntimeError("未能启动默认浏览器，请检查系统默认浏览器设置。")
-        except (ValueError, RuntimeError, webbrowser.Error) as exc:
-            QMessageBox.warning(self, "无法打开夸克搜索", str(exc))
 
     def begin_search(self):
         # ==============================================

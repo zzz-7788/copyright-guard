@@ -3,20 +3,13 @@
 import os
 import re
 from html import unescape
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlsplit
 
 from .base import SearchProvider
 from app.utils.url_utils import normalize_url
 
 
 DEFAULT_ENDPOINT = "iqs.cn-zhangjiakou.aliyuncs.com"
-
-
-def search_url(query):
-    query = query.strip()
-    if not query:
-        raise ValueError("请先输入夸克搜索关键词。")
-    return "https://quark.sm.cn/s?" + urlencode({"q": query, "safe": "1"})
 
 
 def _plain_text(value):

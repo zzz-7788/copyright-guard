@@ -80,6 +80,7 @@ class QuarkApiTests(unittest.TestCase):
             db = Database(Path(folder) / "test.db")
             window = MainWindow(db)
             self.assertIn("夸克", window.search.engine_checks)
+            self.assertFalse(hasattr(window.search, "quark_browser_btn"))
             window.close()
             window.deleteLater()
             app.processEvents()
