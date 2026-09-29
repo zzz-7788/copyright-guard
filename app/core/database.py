@@ -1002,6 +1002,27 @@ class Database:
 
             return [dict(r) for r in rows]
 
+    def get_result_by_url(self, work_id, url):
+        """Return an existing result for a work after URL normalization."""
+        if not work_id:
+            return None
+
+        normalized_url = normalize_url(url)
+        if not normalized_url:
+            return None
+
+        with self.connect() as con:
+            row = con.execute(
+                """
+                SELECT *
+                FROM search_results
+                WHERE work_id=? AND url=?
+                """,
+                (work_id, normalized_url),
+            ).fetchone()
+
+        return dict(row) if row else None
+
     def update_result_status(
         self,
         result_id,

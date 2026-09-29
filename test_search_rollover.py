@@ -64,6 +64,28 @@ class SearchRolloverTests(unittest.TestCase):
         self.assertEqual(rows[current]["status"], "ignored")
         self.assertEqual(rows[other]["status"], "potential")
 
+    def test_rediscovered_ignored_result_stays_ignored(self):
+        result_id = self.add_result("rediscovered")
+        self.db.update_result_status(result_id, "ignored")
+
+        existing = self.db.get_result_by_url(
+            self.work["id"],
+            "https://example.com/rediscovered",
+        )
+        returned_id = self.db.add_result({
+            "work_id": self.work["id"],
+            "title": "rediscovered",
+            "url": "https://example.com/rediscovered",
+            "domain": "example.com",
+            "sources": ["夸克"],
+        })
+
+        rows = {row["id"]: row for row in self.db.list_results(self.work["id"])}
+        self.assertIsNotNone(existing)
+        self.assertEqual(existing["status"], "ignored")
+        self.assertEqual(returned_id, result_id)
+        self.assertEqual(rows[result_id]["status"], "ignored")
+
     def test_search_page_defaults_to_potential(self):
         window = MainWindow(self.db)
         self.assertEqual(window.search.status_filter.currentData(), "potential")

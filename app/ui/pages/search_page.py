@@ -198,6 +198,9 @@ class SearchPage(QWidget):
         self.search_received = 0
         self.search_filtered = 0
         self.search_kept = 0
+        self.search_new = 0
+        self.search_duplicates = 0
+        self.search_duplicate_ignored = 0
         self.search_errors = {}
 
         outer = QVBoxLayout(self)
@@ -836,6 +839,9 @@ class SearchPage(QWidget):
         self.search_received = 0
         self.search_filtered = 0
         self.search_kept = 0
+        self.search_new = 0
+        self.search_duplicates = 0
+        self.search_duplicate_ignored = 0
 
         self.search_total = (
             len(self.active_engines)
@@ -990,12 +996,22 @@ class SearchPage(QWidget):
 
         for result in selected_results:
             try:
+                existing = self.db.get_result_by_url(
+                    result.get("work_id"),
+                    result.get("url", ""),
+                )
                 self.db.add_result(
                     result
                 )
 
                 saved_count += 1
                 self.search_kept += 1
+                if existing:
+                    self.search_duplicates += 1
+                    if existing.get("status") == "ignored":
+                        self.search_duplicate_ignored += 1
+                else:
+                    self.search_new += 1
 
             except Exception as exc:
                 print(
@@ -1256,8 +1272,9 @@ class SearchPage(QWidget):
         self.error_details.setText(detail)
         self.error_details.setVisible(bool(detail))
         self.summary.setText(self.summary.text() +
-            f" · 本轮候选 {self.search_received} 条，排除名单过滤 {self.search_filtered} 条，"
-            f"保留 {self.search_kept} 条")
+            f" · 本轮返回 {self.search_received} 条，排除名单过滤 {self.search_filtered} 条，"
+            f"新增 {self.search_new} 条，历史重复 {self.search_duplicates} 条"
+            f"（其中已忽略 {self.search_duplicate_ignored} 条）")
         self.refresh_results()
         self.changed()
 
@@ -1332,6 +1349,18 @@ class SearchPage(QWidget):
                     self,
                 )
             )
+
+        if not self.visible_result_ids:
+            empty = QLabel(
+                "当前筛选下没有页面。\n"
+                "如果刚完成搜索，本轮结果可能均为历史重复网址；"
+                "已忽略的网址会继续保持已忽略，不会重新进入疑似页面。"
+            )
+            empty.setAlignment(Qt.AlignCenter)
+            empty.setWordWrap(True)
+            empty.setObjectName("mutedText")
+            empty.setMinimumHeight(96)
+            self.results_box.addWidget(empty)
 
         self.results_box.addStretch()
 
